@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lyra Linux Journal</title>
+  <meta name="description" content="Porting mainline Linux and Debian to the Xiaomi 11 Lite 5G NE (lisa, Snapdragon 778G / SM7325): every problem, its cause and its fix.">
+  <style>
+    :root {
+      --bg: #faf8f4;
+      --surface: #ffffff;
+      --border: #e6e1d8;
+      --text: #1d1b18;
+      --muted: #6b655c;
+      --accent: #b4540a;
+      --accent-soft: #fbeee2;
+      --ok: #1f7a4a;
+      --ok-soft: #e4f4ea;
+      --wip: #9a6a00;
+      --wip-soft: #fbf1d6;
+      --open: #a3302a;
+      --open-soft: #f8e3e1;
+      --code-bg: #f1ede6;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #14130f; --surface: #1c1a16; --border: #2f2b25; --text: #ece7de; --muted: #a39b8f;
+        --accent: #f0904a; --accent-soft: #2e2017; --ok: #5fcf8f; --ok-soft: #17291f;
+        --wip: #e6b84a; --wip-soft: #2b2415; --open: #f0837c; --open-soft: #2e1a18; --code-bg: #24211c;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #14130f; --surface: #1c1a16; --border: #2f2b25; --text: #ece7de; --muted: #a39b8f;
+      --accent: #f0904a; --accent-soft: #2e2017; --ok: #5fcf8f; --ok-soft: #17291f;
+      --wip: #e6b84a; --wip-soft: #2b2415; --open: #f0837c; --open-soft: #2e1a18; --code-bg: #24211c;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-padding-top: 24px; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font);
+      line-height: 1.65; -webkit-font-smoothing: antialiased; }
+    a { color: var(--accent); }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+    header { padding: 56px 0 24px; border-bottom: 1px solid var(--border); }
+    .kicker { font-family: var(--mono); font-size: .8rem; color: var(--accent); letter-spacing: .04em; }
+    h1 { font-size: clamp(1.9rem, 5vw, 2.6rem); line-height: 1.15; margin: 8px 0 12px; }
+    .lede { font-size: 1.1rem; color: var(--muted); margin: 0; }
+    .meta { font-size: .85rem; color: var(--muted); margin-top: 16px; }
+    nav.toc { margin: 28px 0; padding: 16px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+    nav.toc strong { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    nav.toc ol { margin: 8px 0 0; padding-left: 1.3em; columns: 2; column-gap: 28px; }
+    nav.toc li { break-inside: avoid; font-size: .95rem; }
+    @media (max-width: 560px) { nav.toc ol { columns: 1; } }
+    section { padding: 8px 0 20px; }
+    h2 { font-size: 1.45rem; margin: 36px 0 4px; line-height: 1.3; }
+    h2 .v { font-family: var(--mono); font-size: .8rem; font-weight: 500; color: var(--muted); margin-left: 8px; white-space: nowrap; }
+    h3 { font-size: 1.05rem; margin: 22px 0 4px; }
+    p, li { overflow-wrap: anywhere; }
+    code { font-family: var(--mono); font-size: .86em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+    pre { font-family: var(--mono); font-size: .82rem; background: var(--code-bg); padding: 12px 14px; border-radius: 8px; overflow-x: auto; line-height: 1.5; }
+    pre code { background: none; padding: 0; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 4px 18px; margin: 14px 0; }
+    .pcf { display: grid; grid-template-columns: 88px 1fr; gap: 4px 12px; margin: 12px 0; }
+    .pcf dt { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding-top: 3px; }
+    .pcf dd { margin: 0; }
+    @media (max-width: 480px) { .pcf { grid-template-columns: 1fr; } .pcf dt { padding-top: 8px; } }
+    .lesson { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 8px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; font-size: .95rem; }
+    table { width: 100%; border-collapse: collapse; font-size: .93rem; margin: 12px 0; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    .tag { display: inline-block; font-size: .75rem; font-weight: 600; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+    .ok { color: var(--ok); background: var(--ok-soft); }
+    .wip { color: var(--wip); background: var(--wip-soft); }
+    .open { color: var(--open); background: var(--open-soft); }
+    .table-scroll { overflow-x: auto; }
+    footer { border-top: 1px solid var(--border); margin-top: 40px; padding: 24px 0 48px; color: var(--muted); font-size: .88rem; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">LYRA LINUX JOURNAL</div>
+  <h1>Mainline Linux on a Xiaomi 11 Lite 5G NE</h1>
+  <p class="lede">Porting a current mainline kernel and Debian 13 to <em>lisa</em> (Snapdragon 778G, SM7325),
+  next to the Lyra Android ROM. Every wall we hit, what caused it, and what got us past it.</p>
+  <p class="meta">Kernel: mainline v7.4-rc1 · Userland: Debian 13 (trixie) + Phosh · Last updated 2026-11-05</p>
+</header>
+
+<nav class="toc" aria-label="Contents">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#status">Where it stands</a></li>
+    <li><a href="#rules">Goal and ground rules</a></li>
+    <li><a href="#boot">How lisa boots</a></li>
+    <li><a href="#first">First boot</a></li>
+    <li><a href="#display">The display saga</a></li>
+    <li><a href="#usb">USB host and the missing PD mapper</a></li>
+    <li><a href="#rootfs">Finding a home for Debian</a></li>
+    <li><a href="#slots">Slot B kept falling back</a></li>
+    <li><a href="#phosh">Phosh</a></li>
+    <li><a href="#battery">The battery storm</a></li>
+    <li><a href="#radios">Bluetooth, Wi-Fi and MAC addresses</a></li>
+    <li><a href="#speakers">Speakers</a></li>
+    <li><a href="#mics">Microphones (in progress)</a></li>
+    <li><a href="#next">What's next</a></li>
+    <li><a href="#lessons">Lessons</a></li>
+  </ol>
+</nav>
+
+<section id="status">
+  <h2>Where it stands</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Area</th><th>State</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Boot</td><td><span class="tag ok">works</span></td><td>Slot B: <code>boot_b</code> + <code>vendor_boot_b</code>; Android stays on slot A</td></tr>
+      <tr><td>Display</td><td><span class="tag ok">works</span></td><td>msm DRM, DSI + DSC, csot vtdr6130 panel; first init needs a re-init</td></tr>
+      <tr><td>Touch</td><td><span class="tag ok">works</span></td><td>Goodix Berlin, 1080×2400</td></tr>
+      <tr><td>GPU</td><td><span class="tag ok">works</span></td><td>Mesa freedreno, OpenGL ES 3.2</td></tr>
+      <tr><td>Debian rootfs</td><td><span class="tag ok">works</span></td><td>Internal 32 GiB partition; USB drive as rescue</td></tr>
+      <tr><td>USB host / device</td><td><span class="tag ok">works</span></td><td>Hub, keyboard, storage; USB ethernet gadget in the initramfs</td></tr>
+      <tr><td>Wi-Fi</td><td><span class="tag ok">works</span></td><td>ath11k (WCN6750)</td></tr>
+      <tr><td>Bluetooth</td><td><span class="tag ok">works</span></td><td>Scanning; pairing untested</td></tr>
+      <tr><td>Battery</td><td><span class="tag ok">works</span></td><td>Two kernel fixes to qcom_battmgr</td></tr>
+      <tr><td>Speakers</td><td><span class="tag ok">works</span></td><td>2× TFA9873, stereo, PipeWire</td></tr>
+      <tr><td>Microphones</td><td><span class="tag wip">partly</span></td><td>Main mic captures; second mic reads zeros</td></tr>
+      <tr><td>Phosh UI</td><td><span class="tag ok">works</span></td><td>Lock screen, app grid, on-screen keyboard</td></tr>
+      <tr><td>Earpiece, charger, calls</td><td><span class="tag open">open</span></td><td>Modem boots (crashes once, recovers)</td></tr>
+      <tr><td>Rotation sensor</td><td><span class="tag open">open</span></td><td>Behind the ADSP sensor hub, no mainline support</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="rules">
+  <h2>Goal and ground rules</h2>
+  <p>The goal is a real mainline kernel with Debian on lisa, not a halium-style Android container. The
+  phone also has to keep working as an Android phone, so a few rules held for the whole project:</p>
+  <ul>
+    <li><strong>Linux lives on slot B; Android (Lyra) stays on slot A.</strong> Only <code>boot_b</code> and
+      <code>vendor_boot_b</code> are ever flashed.</li>
+    <li>No <code>fastboot reboot</code> (resets are Power + Volume-Down for 10 s), no
+      <code>--spl_downgrade</code>, no MIUI, never lock the bootloader.</li>
+    <li>After every flash, check that slot A is still bootable.</li>
+  </ul>
+  <p>Slot-based dual boot is only a test setup. Virtual A/B updates write the inactive slot, so the
+  first Android OTA would wipe Linux. The long-term plan is a boot menu inside the Android boot
+  ramdisk that kexecs into mainline, so it survives every update. Whether kexec works on this SoC is
+  still the open go/no-go question.</p>
+</section>
+
+<section id="boot">
+  <h2>How lisa boots <span class="v">phase 0</span></h2>
+  <ul>
+    <li>The bootloader (ABL) uses <strong>boot header v3</strong>. <code>boot.img</code> carries only the kernel;
+      the device tree, the vendor ramdisk and the kernel command line come from <code>vendor_boot</code>
+      of the same slot.</li>
+    <li>That is why <code>fastboot boot</code> with a mainline image just resets the phone: ABL still uses the
+      slot's Android vendor_boot and its DTB. We build our own vendor_boot, as postmarketOS does.</li>
+    <li>ABL picks the DTB by id, so the mainline DTB gets <code>qcom,msm-id = &lt;0x1db 0x10000&gt;</code> and
+      <code>qcom,board-id = &lt;0x1000b 0x00&gt;</code> injected at build time.</li>
+    <li>An <em>erased</em> <code>dtbo_b</code> boots. A valid dtbo with no matching overlay makes ABL refuse the
+      boot.</li>
+    <li>Every failed boot counts against the active slot. After a few, the slot is marked unbootable.</li>
+  </ul>
+  <p>Mainline already had a basic <code>sm7325-xiaomi-lisa.dts</code> (framebuffer, touch, Wi-Fi, Bluetooth,
+  modem, GPU). Panel and sound only existed in an older fork, and the community
+  <a href="https://github.com/sc7280-mainline/linux">sc7280-mainline</a> tree was the main SoC reference.</p>
+</section>
+
+<section id="first">
+  <h2>First boot <span class="v">v1–v5</span></h2>
+  <p>The first image was a tiny busybox initramfs that brings up a USB ethernet gadget and telnet. Over
+  the cable the phone is <code>172.16.42.1</code>. It booted on the first serious try. Two build fixes
+  were needed: <code>CONFIG_OCMEM=y</code> (the GPU depends on it) and small fixes to compile the fork's
+  panel driver on 7.4. With the Qualcomm firmware in <code>/lib/firmware</code>, the ADSP, CDSP and WPSS
+  remote processors came up.</p>
+</section>
+
+<section id="display">
+  <h2>The display saga <span class="v">v6–v15</span></h2>
+  <p>The panel chain is MDSS/DPU → DSI0 + 7 nm PHY → a <code>csot,vtdr6130</code> command-mode panel with
+  DSC. It took ten builds to get a picture.</p>
+
+  <div class="card">
+    <h3>Black screen</h3>
+    <dl class="pcf">
+      <dt>Cause</dt><dd>The fixed regulator on gpio46 that feeds the panel's logic supply was switched off when it registered.</dd>
+      <dt>Fix</dt><dd><code>regulator-boot-on</code> + <code>regulator-always-on</code> on it and on two LDOs.</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h3>Frozen splash</h3>
+    <dl class="pcf">
+      <dt>Cause</dt><dd>The MDSS reset kills the bootloader's continuous splash.</dd>
+      <dt>Outcome</dt><dd>Keeping the splash alive gave black every time. Dead end, abandoned.</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h3>"DSI PLL(0) lock failed"</h3>
+    <dl class="pcf">
+      <dt>Cause</dt><dd>A bug in the 7 nm DSI PHY driver: the PLL bias enable/disable helpers toggle only
+        <code>PLL_SHUTDOWNB</code> and also need to toggle <code>DIGTOP_PWRDN_B</code>.</dd>
+      <dt>Fix</dt><dd>Patch both helpers in <code>dsi_phy_7nm.c</code>. Found through a bug report on another
+        Snapdragon tablet port. Reading registers needed <code>/dev/mem</code>, and on this DSI block every
+        register sits at +4.</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h3>Timeouts on every frame</h3>
+    <dl class="pcf">
+      <dt>Cause</dt><dd>Our own DCS <em>reads</em>. A read turns data lane 0 around, and this panel never hands it back.</dd>
+      <dt>Fix</dt><dd>Never read from the panel: no init-time read, no brightness read-back. A write-only
+        debug file lets us send raw DCS commands.</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h3>Black after boot, everything reports OK</h3>
+    <dl class="pcf">
+      <dt>Cause</dt><dd>The first panel init at boot doesn't take, probably because the bootloader leaves the panel running.</dd>
+      <dt>Workaround</dt><dd>Blank and unblank once after boot. The initramfs does it, and so does a systemd
+        service in Debian. The proper kernel fix is still open.</dd>
+    </dl>
+  </div>
+</section>
+
+<section id="usb">
+  <h2>USB host and the missing PD mapper <span class="v">v16–v18</span></h2>
+  <p>Debian first ran from a USB drive through a hub, and the hub got no power. The root cause was that
+  <code>qcom_pd_mapper</code> was built as a module and <strong>nothing loaded it</strong>. It is an
+  auxiliary device without a modalias, so module coldplug never sees it. Without it the ADSP's
+  charger/USB-C service never registers. That means no UCSI, no Type-C class, no host mode, no VBUS,
+  and a battery driver stuck on <code>EAGAIN</code>.</p>
+  <p>Fix: <code>modprobe qcom_pd_mapper</code> before coldplug. The battery read 99 % at once, and the port
+  switched to host mode as soon as a hub was attached.</p>
+  <div class="lesson">One build silently skipped the root-drive search: the patch script's "already applied"
+  guard matched a string that a comment edit one line earlier had just inserted. Since then, guards check
+  for something only the real change adds, and the image is unpacked and checked before every flash.</div>
+</section>
+
+<section id="rootfs">
+  <h2>Finding a home for Debian <span class="v">v19</span></h2>
+  <p>A rootfs on a USB drive is fine for bring-up, but not for a phone. The internal options:</p>
+  <ul>
+    <li><strong><code>super</code></strong> has about 2.1 GB free, too small, and Android's virtual A/B
+      updates write the next slot into exactly that space.</li>
+    <li><strong><code>userdata</code></strong> is 113 GB but uses <em>metadata encryption</em> with a key in
+      the TEE. Linux cannot read it, so a loop image inside it is impossible.</li>
+  </ul>
+  <p>So we backed up the GPT, shrank <code>userdata</code> to 79 GB, and added a 32 GiB
+  <code>lyra_root</code> partition. That wiped Android's data, which Android simply re-creates on next
+  boot. The v19 initramfs prefers a USB drive labelled <code>lyra-root</code> (the rescue disk) and
+  otherwise boots the internal partition.</p>
+</section>
+
+<section id="slots">
+  <h2>Slot B kept falling back</h2>
+  <p>After about seven Linux boots the phone booted Android again: slot B was marked unbootable. Nothing
+  under Linux told the bootloader the boot had succeeded, so its retry counter ran down. Debian's
+  <code>qbootctl</code> marks the slot good on every boot. It needed a small drop-in to wait for udev's
+  partition links.</p>
+</section>
+
+<section id="phosh">
+  <h2>Phosh</h2>
+  <p><code>phosh-core</code> installed and ran, with a lock screen, Wi-Fi in the UI, an app grid and the
+  squeekboard on-screen keyboard. Three things needed fixing:</p>
+  <ul>
+    <li><code>phosh.service</code> conflicts with <code>getty@tty1</code>, and the enabled getty won at boot.</li>
+    <li>phosh-core also pulls in <code>greetd</code>, which sometimes won the race to start the session.
+      We disabled it to go straight to the lock screen.</li>
+    <li>With no charger visible, the phone auto-suspended and dropped SSH. Sleep targets are masked until
+      charging works.</li>
+  </ul>
+  <p>There's no auto-rotation: lisa's accelerometer sits behind the ADSP sensor hub, which mainline does
+  not support.</p>
+</section>
+
+<section id="battery">
+  <h2>The battery storm <span class="v">v18–v21</span></h2>
+  <p>With the battery driver bound, systemd-journald kept getting killed after 90 s. The console was full
+  of <code>time_to_full_avg ... -110</code> timeouts, about one a second.</p>
+  <div class="card">
+    <h3>Driver bug: a missed completion</h3>
+    <dl class="pcf">
+      <dt>Cause</dt><dd>The firmware <em>does</em> answer that request, with an unexpected payload length.
+        <code>qcom_battmgr</code> flags the error and returns <strong>without completing the request</strong>, so
+        every query sits out a 1 s timeout. One battery notification a second, each followed by a full
+        property read, makes a uevent storm that stalls udev and journald.</dd>
+      <dt>Fix</dt><dd>Complete the request on every bad-length path and rate-limit the warnings. A full
+        property read went from over 20 s to 7 ms.</dd>
+    </dl>
+  </div>
+  <div class="card">
+    <h3>Xiaomi's property map is shifted</h3>
+    <dl class="pcf">
+      <dt>Symptom</dt><dd>Temperature 540 °C, cycle count in the hundreds of millions, model name as a number.</dd>
+      <dt>Cause</dt><dd>Xiaomi's firmware inserts an extra battery property at index 12. Found by reading
+        Xiaomi's published lisa kernel source.</dd>
+      <dt>Fix</dt><dd>A per-device index offset. Now: 28 °C, Li-poly, 348 cycles, the right model string.</dd>
+    </dl>
+  </div>
+  <p>Both fixes are being prepared for upstream.</p>
+</section>
+
+<section id="radios">
+  <h2>Bluetooth, Wi-Fi and MAC addresses</h2>
+  <ul>
+    <li>The bootloader passes no Bluetooth address or Wi-Fi MAC. Bluetooth came up
+      <em>unconfigured</em>, and Wi-Fi picked a random MAC (and a new DHCP lease) every boot.
+      A small boot service now derives stable, locally administered addresses from the device serial.</li>
+    <li><code>btmgmt</code> never exits without a TTY. It works, then hangs. Wrapping it in <code>script</code> fixes that.</li>
+    <li><strong>Wi-Fi dropped every few minutes.</strong> The firmware boots with the world regulatory domain,
+      where 5 GHz DFS channels are passive-only. Roaming to the 5 GHz access point timed out, and
+      NetworkManager eventually gave up. Setting the country (<code>iw reg set</code>) at boot fixed it.</li>
+  </ul>
+</section>
+
+<section id="speakers">
+  <h2>Speakers <span class="v">v22</span></h2>
+  <p>The ADSP speaks APR (the "Elite" audio firmware), so the mainline q6afe/q6asm/q6routing stack
+  applies. Lisa has two NXP TFA9873 amplifiers on I²C fed by primary MI2S, the same as the Xiaomi
+  <em>taoyao</em> in sc7280-mainline, whose TFA9872/9873 driver we picked up.</p>
+  <ul>
+    <li>Left is the top speaker and right is the bottom one, checked by ear.</li>
+    <li>PipeWire needed a UCM profile for lisa before it would offer a normal "Speakers" sink.</li>
+    <li><strong>Silent playback while everything said RUNNING:</strong> PipeWire picked 24-bit samples, and
+      the speakers only play 16-bit. A WirePlumber rule pins S16LE for now.</li>
+  </ul>
+</section>
+
+<section id="mics">
+  <h2>Microphones <span class="v">v23–v26, in progress</span></h2>
+  <p>The mics sit on a WCD9385 codec, connected over SoundWire, behind the LPASS RX/TX/VA "macros".
+  On this firmware the macro clocks are owned by the DSP, so they vote through <code>q6afecc</code>.</p>
+  <ul>
+    <li><strong>v23:</strong> the codec enumerated on both SoundWire buses and every DAPM widget on the capture
+      path powered up, but every sample was exactly zero.</li>
+    <li><strong>v24:</strong> extra front ends, so playing and recording at the same time works.</li>
+    <li><strong>v25</strong> tried the older TX macro input layout. That was the wrong direction.</li>
+    <li><strong>The breakthrough</strong> was a sweep of every ADC, input mux and SoundWire input. Lisa's main
+      microphone (AMIC5 → ADC4) carries real audio on <code>SWR_MIC5</code>, and a quiet test tone shows
+      up exactly where it played. That confirms the newer (v9.2) TX macro layout is right for SM7325.</li>
+    <li><strong>Still open:</strong> everything on the codec's first SoundWire data port (ADC1/ADC2, the second
+      mic) reads exact zeros, whatever ADC or input feeds it. Retiming that port (v26) changed nothing on
+      the wire, so the cause lies elsewhere.</li>
+  </ul>
+  <div class="lesson">Don't trust "it's all powered up". The decisive data came from sweeping every
+  combination and looking for <em>any</em> non-zero sample, then checking with a quiet test tone.</div>
+</section>
+
+<section id="next">
+  <h2>What's next</h2>
+  <ol>
+    <li>Make the main mic the default in PipeWire, and find the second mic's zero data.</li>
+    <li>Earpiece (switched by a GPIO between the top amplifier and the earpiece).</li>
+    <li>Fix the panel's first init in the kernel (the garbled white screen on some boots).</li>
+    <li>Charger detection, then modem stability and calls.</li>
+    <li>The kexec boot menu, so Linux survives Android updates.</li>
+    <li>Upstream: the battery fixes, the DSI PHY fix and the lisa device tree.</li>
+  </ol>
+</section>
+
+<section id="lessons">
+  <h2>Lessons</h2>
+  <ul>
+    <li><strong>Read the boot chain before flashing anything.</strong> Header v3 and vendor_boot explained why
+      the obvious <code>fastboot boot</code> could never work.</li>
+    <li><strong>Silent zeros and "RUNNING" mean nothing.</strong> Both the speaker and the mic bugs looked
+      healthy at every layer we asked.</li>
+    <li><strong>Vendor source is the ground truth for quirks.</strong> Xiaomi's kernel and Android audio
+      configs settled the battery property shift and the mic wiring.</li>
+    <li><strong>Keep a way back.</strong> Slot A untouched, a USB rescue disk, a GPT backup before
+      repartitioning, and every image checksummed before and after flashing.</li>
+  </ul>
+</section>
+
+<footer>
+  By Noufal Babu · <a href="https://noufalbabu.com/">noufalbabu.com</a><br>
+  Thanks to the postmarketOS, sc7280-mainline and mainlining communities, whose trees and notes made this possible.
+  Not affiliated with Xiaomi or Qualcomm.
+</footer>
+
+</div>
+</body>
+</html>
